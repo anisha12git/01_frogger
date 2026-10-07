@@ -1,11 +1,6 @@
 """
 GameEngine: owns the frog and all vehicles, and runs one frame's worth
 of game logic.
-
-Starter version: the frog can move, hop across the road, and reach the
-goal - but there's no lives system, no score, and no timer. Collision
-detection also has a known bug (see game/collisions.py) that Task 1
-asks you to fix.
 """
 
 import random
@@ -21,6 +16,8 @@ from game.renderer import (
 
 LANE_SPEEDS = [1.5, -2, 2, -2.5, 1.5, -2]
 
+ATTEMPT_TIME = 30
+
 
 class GameEngine:
     def __init__(self):
@@ -28,10 +25,12 @@ class GameEngine:
         self.score = 0
         self.game_over = False
         self.game_won = False
+        self.attempt_start_time = pygame.time.get_ticks()
         self._build_entities()
 
     def _build_entities(self):
         start_col = GRID_COLS // 2
+
         self.frog = Frog(
             col=start_col,
             row=START_ROW,
@@ -84,12 +83,17 @@ class GameEngine:
                     )
                 )
 
+    def _start_new_attempt(self):
+        self.frog.reset()
+        self.attempt_start_time = pygame.time.get_ticks()
+
     def handle_keydown(self, key):
         if key == pygame.K_r:
             self.lives = 3
             self.score = 0
             self.game_over = False
             self.game_won = False
+            self.attempt_start_time = pygame.time.get_ticks()
             self._build_entities()
             return
 
@@ -109,6 +113,20 @@ class GameEngine:
         if self.game_over or self.game_won:
             return
 
+        current_time = pygame.time.get_ticks()
+        elapsed_seconds = (current_time - self.attempt_start_time) / 1000
+        remaining_time = ATTEMPT_TIME - elapsed_seconds
+
+        if remaining_time <= 0:
+            self.lives -= 1
+
+            if self.lives <= 0:
+                self.game_over = True
+            else:
+                self._start_new_attempt()
+
+            return
+
         for v in self.vehicles:
             v.update(road_width_px=WIDTH)
 
@@ -118,7 +136,7 @@ class GameEngine:
             if self.lives <= 0:
                 self.game_over = True
             else:
-                self.frog.reset()
+                self._start_new_attempt()
 
             return
 
@@ -130,6 +148,10 @@ class GameEngine:
         from game import renderer
 
         renderer.draw_scene(surface, self.frog, self.vehicles)
+
+        current_time = pygame.time.get_ticks()
+        elapsed_seconds = (current_time - self.attempt_start_time) / 1000
+        remaining_time = max(0, int(ATTEMPT_TIME - elapsed_seconds))
 
         renderer.draw_text(
             surface,
@@ -143,6 +165,13 @@ class GameEngine:
             font,
             f"Score: {self.score}",
             (10, 35),
+        )
+
+        renderer.draw_text(
+            surface,
+            font,
+            f"Time: {remaining_time}s",
+            (10, 60),
         )
 
         renderer.draw_text(
