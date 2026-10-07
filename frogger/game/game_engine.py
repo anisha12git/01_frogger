@@ -19,25 +19,35 @@ from game.renderer import (
     GRID_COLS, GRID_ROWS, GOAL_ROW, ROAD_ROWS, START_ROW, CELL_SIZE, WIDTH, HEIGHT,
 )
 
-LANE_SPEEDS = [1.5, -2, 2, -2.5, 1.5, -2]   # one entry per road row, alternating direction
+LANE_SPEEDS = [1.5, -2, 2, -2.5, 1.5, -2]
 
 
 class GameEngine:
     def __init__(self):
         self.lives = 3
+        self.score = 0
         self.game_over = False
+        self.game_won = False
         self._build_entities()
 
     def _build_entities(self):
         start_col = GRID_COLS // 2
         self.frog = Frog(
-            col=start_col, row=START_ROW,
-            start_col=start_col, start_row=START_ROW,
-            cols=GRID_COLS, start_row_limit=START_ROW,
+            col=start_col,
+            row=START_ROW,
+            start_col=start_col,
+            start_row=START_ROW,
+            cols=GRID_COLS,
+            start_row_limit=START_ROW,
         )
-        frog_x_range = (start_col * CELL_SIZE, start_col * CELL_SIZE + CELL_SIZE)
+
+        frog_x_range = (
+            start_col * CELL_SIZE,
+            start_col * CELL_SIZE + CELL_SIZE,
+        )
 
         self.vehicles = []
+
         for i, row in enumerate(ROAD_ROWS):
             speed = LANE_SPEEDS[i % len(LANE_SPEEDS)]
             vehicle_width = 40 if i % 2 == 0 else 70
@@ -54,7 +64,10 @@ class GameEngine:
                     x = offset if speed > 0 else WIDTH - offset - vehicle_width
                     positions.append(x)
 
-                    if not (x + vehicle_width <= frog_x_range[0] or x >= frog_x_range[1]):
+                    if not (
+                        x + vehicle_width <= frog_x_range[0]
+                        or x >= frog_x_range[1]
+                    ):
                         safe = False
 
                 if safe:
@@ -74,11 +87,13 @@ class GameEngine:
     def handle_keydown(self, key):
         if key == pygame.K_r:
             self.lives = 3
+            self.score = 0
             self.game_over = False
+            self.game_won = False
             self._build_entities()
             return
 
-        if self.game_over:
+        if self.game_over or self.game_won:
             return
 
         if key == pygame.K_UP:
@@ -91,7 +106,7 @@ class GameEngine:
             self.frog.move(1, 0)
 
     def update(self):
-        if self.game_over:
+        if self.game_over or self.game_won:
             return
 
         for v in self.vehicles:
@@ -105,8 +120,11 @@ class GameEngine:
             else:
                 self.frog.reset()
 
+            return
+
         if self.frog.row == GOAL_ROW:
-            self.frog.reset()
+            self.score += 1
+            self.game_won = True
 
     def draw(self, surface, font):
         from game import renderer
@@ -123,9 +141,27 @@ class GameEngine:
         renderer.draw_text(
             surface,
             font,
+            f"Score: {self.score}",
+            (10, 35),
+        )
+
+        renderer.draw_text(
+            surface,
+            font,
             "Arrow keys to move. R to restart.",
             (10, HEIGHT - 24),
         )
 
         if self.game_over:
-            renderer.draw_banner(surface, font, "GAME OVER - Press R to restart")
+            renderer.draw_banner(
+                surface,
+                font,
+                "GAME OVER - Press R to restart",
+            )
+
+        elif self.game_won:
+            renderer.draw_banner(
+                surface,
+                font,
+                f"YOU WIN! Score: {self.score} - Press R to restart",
+            )
